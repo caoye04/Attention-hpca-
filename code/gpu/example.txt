@@ -1,0 +1,11 @@
+$ source /home/software/spack/share/spack/setup-env.sh
+$ spack load gcc@10.4.0 cmake@3.24.3%gcc@10.4.0 cuda@11.8.0%gcc@10.4.0 openmpi
+$ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(spack location -i cuda@11.8.0%gcc@10.4.0)/lib64
+
+$ make
+rm -rf opt benchmark.o opt.o
+nvcc -c  benchmark.cu -o benchmark.o
+nvcc -c  opt.cu -o opt.o
+nvcc -o opt benchmark.o opt.o  -L/home/software/spack/opt/spack/linux-rhel7-cascadelake/gcc-10.4.0/cuda-11.8.0-ltatyhkulwsdozesfrydkiexsohrz2cv -L/home/software/spack/opt/spack/linux-rhel7-cascadelake/gcc-10.4.0/cuda-11.8.0-ltatyhkulwsdozesfrydkiexsohrz2cv/stubs -lcuda -lcudart
+
+$ ... your srun here

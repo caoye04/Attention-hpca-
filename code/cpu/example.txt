@@ -1,0 +1,53 @@
+$ source /home/software/spack/share/spack/setup-env.sh
+$ spack load gcc@10.4.0 cmake@3.24.3%gcc@10.4.0 cuda@11.8.0%gcc@10.4.0 openmpi
+$ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(spack location -i cuda@11.8.0%gcc@10.4.0)/lib64
+
+$ make
+rm -f naive benchmark.o naive.o
+mpicxx -c -Wall -DGETTIMEOFDAY -std=c++11  benchmark.c
+mpicxx -c -Wall -DGETTIMEOFDAY -std=c++11  naive.c
+mpicxx -o naive benchmark.o naive.o -lpthread -lm
+
+$ srun --ntasks=4 --nodes=4 -c48 --cpu-bind=verbose ./naive
+cpu-bind=MASK - node4, task  3  0 [11509]: mask 0xffffffffffff set
+cpu-bind=MASK - node1, task  0  0 [9443]: mask 0xffffffffffff set
+cpu-bind=MASK - node3, task  2  0 [19072]: mask 0xffffffffffff set
+cpu-bind=MASK - node2, task  1  0 [34919]: mask 0xffffffffffff set
+Description:	Naive implementation.
+
+Size: 63	Gflop/s: 0.544 (128 iter, 0.118 seconds)
+Size: 64	Gflop/s: 0.544 (128 iter, 0.123 seconds)
+Size: 65	Gflop/s: 0.545 (128 iter, 0.129 seconds)
+Size: 127	Gflop/s: 0.555 (16 iter, 0.118 seconds)
+Size: 128	Gflop/s: 0.526 (16 iter, 0.128 seconds)
+Size: 129	Gflop/s: 0.555 (16 iter, 0.124 seconds)
+Size: 191	Gflop/s: 0.559 (8 iter, 0.199 seconds)
+Size: 192	Gflop/s: 0.55 (4 iter, 0.103 seconds)
+Size: 193	Gflop/s: 0.559 (4 iter, 0.103 seconds)
+Size: 255	Gflop/s: 0.558 (2 iter, 0.119 seconds)
+Size: 256	Gflop/s: 0.529 (2 iter, 0.127 seconds)
+Size: 257	Gflop/s: 0.559 (2 iter, 0.122 seconds)
+Size: 319	Gflop/s: 0.559 (2 iter, 0.232 seconds)
+Size: 320	Gflop/s: 0.531 (2 iter, 0.247 seconds)
+Size: 321	Gflop/s: 0.559 (2 iter, 0.237 seconds)
+Size: 383	Gflop/s: 0.559 (2 iter, 0.402 seconds)
+Size: 384	Gflop/s: 0.529 (2 iter, 0.428 seconds)
+Size: 385	Gflop/s: 0.558 (2 iter, 0.409 seconds)
+Size: 447	Gflop/s: 0.558 (2 iter, 0.640 seconds)
+Size: 448	Gflop/s: 0.53 (2 iter, 0.679 seconds)
+Size: 449	Gflop/s: 0.558 (2 iter, 0.648 seconds)
+Size: 511	Gflop/s: 0.557 (2 iter, 0.958 seconds)
+Size: 512	Gflop/s: 0.521 (2 iter, 1.030 seconds)
+Size: 513	Gflop/s: 0.558 (2 iter, 0.968 seconds)
+Size: 575	Gflop/s: 0.542 (2 iter, 1.403 seconds)
+Size: 576	Gflop/s: 0.525 (2 iter, 1.455 seconds)
+Size: 577	Gflop/s: 0.541 (2 iter, 1.421 seconds)
+Size: 639	Gflop/s: 0.522 (2 iter, 1.999 seconds)
+Size: 640	Gflop/s: 0.522 (2 iter, 2.007 seconds)
+Size: 641	Gflop/s: 0.519 (2 iter, 2.029 seconds)
+Size: 703	Gflop/s: 0.513 (2 iter, 2.709 seconds)
+Size: 704	Gflop/s: 0.523 (2 iter, 2.668 seconds)
+Size: 705	Gflop/s: 0.514 (2 iter, 2.726 seconds)
+Size: 767	Gflop/s: 0.513 (2 iter, 3.517 seconds)
+Size: 768	Gflop/s: 0.515 (2 iter, 3.519 seconds)
+Average 0.540321
