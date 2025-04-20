@@ -1,6 +1,6 @@
 CUDAC = nvcc
 
-CUDAOPT =
+CUDAOPT = -use_fast_math
 
 CUDAFLAGS = $(CUDAOPT)
 
