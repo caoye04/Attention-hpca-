@@ -5,7 +5,7 @@
 #include <cuda_runtime.h>
 #include <math.h>
 
-const char* version_name = "Opt model";
+const char* version_name = "Conservative vectorized implementation with register blocking";
 
 #define TILE_SIZE 64
 #define REG_TILE_SIZE 4
@@ -28,25 +28,41 @@ __global__ void matmul_QKT_register_blocked(int n, float* Q, float* K, float* QK
     
     for (int t = 0; t < (n + TILE_SIZE - 1) / TILE_SIZE; ++t) {
         for (int i = ty; i < TILE_SIZE; i += blockDim.y) {
-            for (int j = tx; j < TILE_SIZE; j += blockDim.x) {
-                int r = by * TILE_SIZE + i;
+            int r = by * TILE_SIZE + i;
+            
+            for (int j = tx * 2; j < TILE_SIZE; j += blockDim.x * 2) {
                 int c = t * TILE_SIZE + j;
+                
                 if (r < n && c < n) {
                     s_Q[i][j] = Q[r * n + c];
                 } else {
                     s_Q[i][j] = 0.0f;
                 }
+                
+                if (r < n && c + 1 < n) {
+                    s_Q[i][j+1] = Q[r * n + c + 1];
+                } else {
+                    s_Q[i][j+1] = 0.0f;
+                }
             }
         }
         
         for (int i = ty; i < TILE_SIZE; i += blockDim.y) {
-            for (int j = tx; j < TILE_SIZE; j += blockDim.x) {
-                int r = t * TILE_SIZE + i;
+            int r = t * TILE_SIZE + i;
+            
+            for (int j = tx * 2; j < TILE_SIZE; j += blockDim.x * 2) {
                 int c = bx * TILE_SIZE + j;
+                
                 if (r < n && c < n) {
                     s_K[j][i] = K[c * n + r];
                 } else {
                     s_K[j][i] = 0.0f;
+                }
+                
+                if (r < n && c + 1 < n) {
+                    s_K[j+1][i] = K[(c+1) * n + r];
+                } else {
+                    s_K[j+1][i] = 0.0f;
                 }
             }
         }
@@ -113,7 +129,7 @@ __global__ void softmax_warp_optimized(int n, float* QKT) {
         float sum_exp = 0.0f;
         for (int j = lane_id; j < n; j += WARP_SIZE) {
             float val = expf(QKT[row * n + j] - max_val);
-            QKT[row * n + j] = val; // Store intermediate result
+            QKT[row * n + j] = val;
             sum_exp += val;
         }
         
@@ -131,8 +147,8 @@ __global__ void softmax_warp_optimized(int n, float* QKT) {
 }
 
 __global__ void matmul_softmax_V_register_blocked(int n, float* softmax_QKT, float* V, float* Y) {
-    __shared__ float s_softmax[TILE_SIZE][TILE_SIZE+1];  // +1 to avoid bank conflicts
-    __shared__ float s_V[TILE_SIZE][TILE_SIZE+1];  // +1 to avoid bank conflicts
+    __shared__ float s_softmax[TILE_SIZE][TILE_SIZE+1]; 
+    __shared__ float s_V[TILE_SIZE][TILE_SIZE+1];
     
     int bx = blockIdx.x;
     int by = blockIdx.y;
@@ -146,32 +162,48 @@ __global__ void matmul_softmax_V_register_blocked(int n, float* softmax_QKT, flo
     
     for (int t = 0; t < (n + TILE_SIZE - 1) / TILE_SIZE; ++t) {
         for (int i = ty; i < TILE_SIZE; i += blockDim.y) {
-            for (int j = tx; j < TILE_SIZE; j += blockDim.x) {
-                int r = by * TILE_SIZE + i;
+            int r = by * TILE_SIZE + i;
+            
+            for (int j = tx * 2; j < TILE_SIZE; j += blockDim.x * 2) {
                 int c = t * TILE_SIZE + j;
+                
                 if (r < n && c < n) {
                     s_softmax[i][j] = softmax_QKT[r * n + c];
                 } else {
                     s_softmax[i][j] = 0.0f;
                 }
+                
+                if (r < n && c + 1 < n) {
+                    s_softmax[i][j+1] = softmax_QKT[r * n + c + 1];
+                } else {
+                    s_softmax[i][j+1] = 0.0f;
+                }
             }
         }
         
         for (int i = ty; i < TILE_SIZE; i += blockDim.y) {
-            for (int j = tx; j < TILE_SIZE; j += blockDim.x) {
-                int r = t * TILE_SIZE + i;
+            int r = t * TILE_SIZE + i;
+            
+            for (int j = tx * 2; j < TILE_SIZE; j += blockDim.x * 2) {
                 int c = bx * TILE_SIZE + j;
+                
                 if (r < n && c < n) {
                     s_V[j][i] = V[r * n + c];
                 } else {
                     s_V[j][i] = 0.0f;
+                }
+                
+                if (r < n && c + 1 < n) {
+                    s_V[j+1][i] = V[r * n + c + 1];
+                } else {
+                    s_V[j+1][i] = 0.0f;
                 }
             }
         }
         
         __syncthreads();
         
-        #pragma unroll 4
+        #pragma unroll 8
         for (int k = 0; k < TILE_SIZE; ++k) {
             float softmax_vals[REG_TILE_SIZE];
             #pragma unroll
