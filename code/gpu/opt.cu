@@ -5,10 +5,9 @@
 #include <cuda_runtime.h>
 #include <math.h>
 
-const char* version_name = "Warp-optimized Softmax implementation.";
+const char* version_name = "Shared Memory Optimized implementation.";
 
 #define TILE_SIZE 16
-#define WARP_SIZE 32
 
 __global__ void matmul_QKT_shared(int n, float* Q, float* K, float* QKT, float scale) {
     __shared__ float tile_Q[TILE_SIZE][TILE_SIZE];
@@ -46,39 +45,23 @@ __global__ void matmul_QKT_shared(int n, float* Q, float* K, float* QKT, float s
         QKT[row * n + col] = sum * scale;
 }
 
-__global__ void softmax_warp_optimized(int n, float* QKT) {
-    int row = blockIdx.x * (blockDim.x / WARP_SIZE) + threadIdx.x / WARP_SIZE;
-    int lane_id = threadIdx.x % WARP_SIZE;
+__global__ void softmax_kernel(int n, float* QKT) {
+    int row = blockIdx.x * blockDim.x + threadIdx.x;
     
     if (row < n) {
         float max_val = -INFINITY;
-        for (int j = lane_id; j < n; j += WARP_SIZE) {
-            float val = QKT[row * n + j];
-            max_val = fmaxf(max_val, val);
+        for (int j = 0; j < n; j++) {
+            if (QKT[row * n + j] > max_val) {
+                max_val = QKT[row * n + j];
+            }
         }
-        
-        #pragma unroll
-        for (int offset = WARP_SIZE/2; offset > 0; offset /= 2) {
-            max_val = fmaxf(max_val, __shfl_down_sync(0xffffffff, max_val, offset));
-        }
-        
-        max_val = __shfl_sync(0xffffffff, max_val, 0);
-        
         float sum_exp = 0.0f;
-        for (int j = lane_id; j < n; j += WARP_SIZE) {
-            float val = expf(QKT[row * n + j] - max_val);
-            QKT[row * n + j] = val; // 存储中间结果
-            sum_exp += val;
+        for (int j = 0; j < n; j++) {
+            QKT[row * n + j] = expf(QKT[row * n + j] - max_val);
+            sum_exp += QKT[row * n + j];
         }
         
-        #pragma unroll
-        for (int offset = WARP_SIZE/2; offset > 0; offset /= 2) {
-            sum_exp += __shfl_down_sync(0xffffffff, sum_exp, offset);
-        }
-        
-        sum_exp = __shfl_sync(0xffffffff, sum_exp, 0);
-        
-        for (int j = lane_id; j < n; j += WARP_SIZE) {
+        for (int j = 0; j < n; j++) {
             QKT[row * n + j] /= sum_exp;
         }
     }
@@ -130,13 +113,12 @@ void square_attention(int n, float* gpu_Q, float* gpu_K, float* gpu_V, float* gp
     dim3 grid_dim((n + TILE_SIZE - 1) / TILE_SIZE, 
                   (n + TILE_SIZE - 1) / TILE_SIZE);
     
-    int threads_per_block = 128;
-    int warps_per_block = threads_per_block / WARP_SIZE;
-    int num_blocks = (n + warps_per_block - 1) / warps_per_block;
+    dim3 softmax_block_dim(256);
+    dim3 softmax_grid_dim((n + softmax_block_dim.x - 1) / softmax_block_dim.x);
     
     matmul_QKT_shared<<<grid_dim, block_dim>>>(n, gpu_Q, gpu_K, gpu_QKT, scale);
-
-    softmax_warp_optimized<<<num_blocks, threads_per_block>>>(n, gpu_QKT);
+    
+    softmax_kernel<<<softmax_grid_dim, softmax_block_dim>>>(n, gpu_QKT);
     
     matmul_softmax_V_shared<<<grid_dim, block_dim>>>(n, gpu_QKT, gpu_V, gpu_Y);
     

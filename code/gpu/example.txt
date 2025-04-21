@@ -9,3 +9,5 @@ nvcc -c  opt.cu -o opt.o
 nvcc -o opt benchmark.o opt.o  -L/home/software/spack/opt/spack/linux-rhel7-cascadelake/gcc-10.4.0/cuda-11.8.0-ltatyhkulwsdozesfrydkiexsohrz2cv -L/home/software/spack/opt/spack/linux-rhel7-cascadelake/gcc-10.4.0/cuda-11.8.0-ltatyhkulwsdozesfrydkiexsohrz2cv/stubs -lcuda -lcudart
 
 $ ... your srun here
+
+$ srun --gres=gpu:1 nsys profile ./opt
