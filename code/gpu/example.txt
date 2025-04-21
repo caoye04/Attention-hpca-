@@ -11,3 +11,4 @@ nvcc -o opt benchmark.o opt.o  -L/home/software/spack/opt/spack/linux-rhel7-casc
 $ ... your srun here
 
 $ srun --gres=gpu:1 nsys profile ./opt
+$ srun --gres=gpu:1 ./opt
