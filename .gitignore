@@ -1,0 +1,4 @@
+code/gpu/opt
+code/gpu/opt.o
+code/gpu/benchmark.o
+*.o
