@@ -5,7 +5,7 @@
 #include <cuda_runtime.h>
 #include <math.h>
 
-const char* version_name = "Conservative vectorized implementation with register blocking";
+const char* version_name = "finally opt!";
 
 #define TILE_SIZE 64
 #define REG_TILE_SIZE 4

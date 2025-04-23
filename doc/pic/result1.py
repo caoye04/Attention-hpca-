@@ -73,7 +73,7 @@ plt.xticks(major_ticks, major_ticks)
 
 # 设置标题和标签
 plt.title('不同优化版本的性能对比', fontsize=16, pad=20)
-plt.xlabel('矩阵大小 (log₂ scale)', fontsize=14)
+plt.xlabel('矩阵大小 (log2 scale)', fontsize=14)
 plt.ylabel('性能 (Gflops/s)', fontsize=14)  # 修改了y轴标签
 
 # 添加图例到图表内部左上角
